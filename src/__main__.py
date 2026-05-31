@@ -115,10 +115,7 @@ while True:
             gen = ""
 
     elif state == "PARAM_VALUES":
-        if not schema_parameters:
-            gen = ""
-            state = "END"
-        elif "," in gen:
+        if "," in gen:
             del schema_parameters[curr_key]
             gen = ""
             state = "PARAM_KEYS" if schema_parameters else "END"
