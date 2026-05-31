@@ -8,11 +8,11 @@ model = Small_LLM_Model()
 functions = [{"name": "fn_add_numbers", "description": "Add three numbers are required together and return their sum.",
               "parameters": {"a": {"type": "number"}, "b": {"type": "number"}}, "returns": {"type": "number"}}]
 
-prompt = 'What is the sum of 2 and 3? answer by using these function tools\t'
+prompt = 'What is the sum of 235 and 335? answer by using these function tools\t'
 prompt += f'{functions[0]}\t'
 prompt += '<think>\n\n</think>\t'
 prompt += 'you are AI assistant answer by: {"prompt": <user-prompt>, "name": <function-name>, "arguments": <args-json-object>}\t'
-prompt += '{"prompt": "What is the sum of 2 and 3?", "name": '
+prompt += '{"prompt": "What is the sum of 235 and 335?", "name": '
 
 
 def get_allowed_tokens(tergets_list: list, logits: list,):
