@@ -98,8 +98,8 @@ while True:
     result = model.decode(next_token)
     gen += result
     json_result += result
-    print(gen, flush=True)
-    print("state :", state)
+    # print(gen, flush=True)
+    # print("state :", state)
     
     if state == "FUNCTION_NAME":
         if gen in name_functions_allowed:
@@ -127,7 +127,7 @@ while True:
             state = "PARAM_KEYS" if schema_parameters else "END"
         elif "}" in gen:
             state = "END"
-result = model.decode(tokens)
+# result = model.decode(tokens)
 print(json_result.count("{") == json_result.count("}"))
 print(json_result)
 print("time: ", (time.time() - start) // 60)
