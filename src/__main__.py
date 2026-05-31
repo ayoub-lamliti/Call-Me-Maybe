@@ -73,6 +73,8 @@ end = model.encode('}')[0].tolist()
 schema_parameters = {}
 
 while True:
+    if state == "END":
+        break
     logits: list = model.get_logits_from_input_ids(tokens)
 
     if state == "FUNCTION_NAME":
@@ -101,7 +103,7 @@ while True:
             print(schema_parameters)
             if not schema_parameters:
                 tokens.extend(end)
-                state = "STOP"
+                state = "END"
             else:
                 gen = ""
                 state = "PARAM_KEYS"
@@ -113,15 +115,14 @@ while True:
             gen = ""
 
     elif state == "PARAM_VALUES":
-        if "," in gen:
+        if not schema_parameters:
+            gen = ""
+            state = "END"
+        elif "," in gen:
             del schema_parameters[curr_key]
             gen = ""
-            print(schema_parameters)
-            
-            state = "PARAM_KEYS"
+            state = "PARAM_KEYS" if schema_parameters else "END"
         elif "}" in gen:
-            state = "STOP"
-    elif state == "STOP":
-        break
+            state = "END"
 
 print(model.decode(tokens))
