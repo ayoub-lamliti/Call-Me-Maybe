@@ -74,7 +74,7 @@ end = model.encode('}')[0].tolist()
 schema_parameters = {}
 
 json_result = '{"prompt": "What is the sum of 2 and 3?", "name": '
-start = time.time()
+start = time()
 while True:
     if state == "END":
         break
@@ -106,7 +106,7 @@ while True:
             tokens.extend(parameters)
             json_result += '", "parameters": {'
             schema_parameters = functions[0]["parameters"]
-            print(schema_parameters)
+            # print(schema_parameters)
             if not schema_parameters:
                 tokens.extend(end)
                 state = "END"
@@ -130,4 +130,4 @@ while True:
 # result = model.decode(tokens)
 print(json_result.count("{") == json_result.count("}"))
 print(json_result)
-print("time: ", (time.time() - start) // 60)
+print("time: ", (time() - start) // 60)
