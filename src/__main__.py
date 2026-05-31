@@ -72,6 +72,8 @@ parameters = model.encode('", "parameters": {')[0].tolist()
 end = model.encode('}')[0].tolist()
 schema_parameters = {}
 
+json_result = '{"prompt": "What is the sum of 2 and 3?", "name": '
+
 while True:
     if state == "END":
         break
@@ -92,13 +94,16 @@ while True:
     masked_logits = apply_logits_mask(logits, allowed_ids)
     next_token = int(np.argmax(masked_logits))
     tokens.append(next_token)
-    gen += model.decode(next_token)
+    result = model.decode(next_token)
+    gen += result
+    json_result += result
     print(gen, flush=True)
     print("state :", state)
     
     if state == "FUNCTION_NAME":
         if gen in name_functions_allowed:
             tokens.extend(parameters)
+            json_result += '", "parameters": {'
             schema_parameters = functions[0]["parameters"]
             print(schema_parameters)
             if not schema_parameters:
@@ -122,5 +127,5 @@ while True:
         elif "}" in gen:
             state = "END"
 result = model.decode(tokens)
-print(result.count("{") == result.count("}"))
-print(result)
+print(json_result.count("{") == json_result.count("}"))
+print(json_result)
