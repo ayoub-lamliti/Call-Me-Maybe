@@ -46,7 +46,7 @@ def build_clean_vocab(model):
 def get_allowed_ids_for_numbers(clean_vocab: dict[int, str]):
     allowed_ids: list = []
 
-    allowed_chars = set("0123456789.-, ")
+    allowed_chars = set("0123456789.-,} ")
     for token_id, token_text in clean_vocab.items():
         if not token_text:
             continue
