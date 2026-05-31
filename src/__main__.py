@@ -2,6 +2,7 @@ from llm_sdk import Small_LLM_Model
 from pprint import pprint
 import numpy as np
 import json
+import time
 model = Small_LLM_Model()
 
 functions = [{"name": "fn_add_numbers", "description": "Add three numbers are required together and return their sum.",
@@ -73,7 +74,7 @@ end = model.encode('}')[0].tolist()
 schema_parameters = {}
 
 json_result = '{"prompt": "What is the sum of 2 and 3?", "name": '
-
+start = time.time()
 while True:
     if state == "END":
         break
@@ -129,3 +130,4 @@ while True:
 result = model.decode(tokens)
 print(json_result.count("{") == json_result.count("}"))
 print(json_result)
+print("time: ", (time.time() - start) // 60)
