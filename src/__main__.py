@@ -117,9 +117,12 @@ while True:
     elif state == "PARAM_KEYS":
         keys = [f'"{key}" :' for key in schema_parameters.keys()]
         if keys:
-            keys_encode = model.encode(f"{keys[0]}")
-        if gen in keys:
-            curr_key = gen.split('"')[1]
+            curr_key = keys[0].split('"')[1]
+            if "," in gen:
+                del schema_parameters[curr_key]
+            keys_encode = model.encode(f"{keys[0]}")[0].tolist()
+            print(keys_encode, keys[0])
+            tokens.extend(keys_encode)
             state = "PARAM_VALUES"
             gen = ""
 
@@ -131,7 +134,8 @@ while True:
         elif "}" in gen:
             state = "END"
 # comment test
-# result = model.decode(tokens)
+result = model.decode(tokens)
 print(f"Execution time: {time.perf_counter() - start:.6f} seconds")
 print(json_result.count("{") == json_result.count("}"))
 print(json_result)
+print(result)
