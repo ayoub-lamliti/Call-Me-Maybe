@@ -98,8 +98,8 @@ while True:
     result = model.decode(next_token)
     gen += result
     json_result += result
-    # print(gen, flush=True)
-    # print("state :", state)
+    print(gen, flush=True)
+    print("state :", state)
     
     if state == "FUNCTION_NAME":
         if gen in name_functions_allowed:
@@ -115,7 +115,10 @@ while True:
                 state = "PARAM_KEYS"
 
     elif state == "PARAM_KEYS":
-        if gen in [f'"{key}" :' for key in schema_parameters.keys()]:
+        keys = [f'"{key}" :' for key in schema_parameters.keys()]
+        if keys:
+            keys_encode = model.encode(f"{keys[0]}")
+        if gen in keys:
             curr_key = gen.split('"')[1]
             state = "PARAM_VALUES"
             gen = ""
