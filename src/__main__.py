@@ -114,19 +114,17 @@ while True:
                 gen = ""
                 state = "PARAM_KEYS"
 
-    elif state == "PARAM_KEYS":
-        keys = [f'"{key}" :' for key in schema_parameters.keys()]
-        if keys:
-            curr_key = keys[0].split('"')[1]
-            if "," in gen:
-                del schema_parameters[curr_key]
-            keys_encode = model.encode(f"{keys[0]}")[0].tolist()
-            print(keys_encode, keys[0])
+    if state == "PARAM_KEYS":
+        for key in schema_parameters.keys():
+            curr_key = key
+            keys_encode = model.encode(f'"{key}": ')[0].tolist()
+            print(keys_encode, key)
             tokens.extend(keys_encode)
             state = "PARAM_VALUES"
             gen = ""
+            break
 
-    elif state == "PARAM_VALUES":
+    if state == "PARAM_VALUES":
         if "," in gen:
             del schema_parameters[curr_key]
             gen = ""
