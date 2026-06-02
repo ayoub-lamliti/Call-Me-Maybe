@@ -91,13 +91,10 @@ state = "FUNCTION_NAME"
 end = model.encode('}')[0].tolist()
 schema_parameters = {}
 
-json_result = ""
 start = time.perf_counter()
-flag = True
 while True:
     if state == "END":
         break
-    # if flag:
     logits: list = model.get_logits_from_input_ids(tokens)
 
     if state == "FUNCTION_NAME":
@@ -116,7 +113,6 @@ while True:
                 allowed_ids = get_allowed_tokens(['"'], gen, clean_vocab)
             else:
                 allowed_ids = get_allowed_ids_for_strings(clean_vocab)
-    # if flag:
     masked_logits = apply_logits_mask(logits, allowed_ids)
     next_token = int(np.argmax(masked_logits))
     tokens.append(next_token)
@@ -133,14 +129,6 @@ while True:
                 state = "PARAM_KEYS"
 
     if state == "PARAM_KEYS":
-        # for key in schema_parameters.keys():
-        #     curr_key = key
-        #     keys_encode = model.encode(f'"{key}": ')[0].tolist()
-        #     tokens.extend(keys_encode)
-        #     state = "PARAM_VALUES"
-        #     gen = ""
-        #     flag = True
-        #     break
         target_keys = [f'"{key}": ' for key in schema_parameters.keys()]
         if gen in target_keys:
             curr_key = gen.split('"')[1]
@@ -165,7 +153,7 @@ while True:
                 state = "END"
 
 result = model.decode(tokens)
+print(f"Execution time: {time.perf_counter() - start:.6f} seconds")
 result = result[result.find(f'{{"prompt": {user}'):]
 print(result.count("{") == result.count("}"))
 print(result)
-print(f"Execution time: {time.perf_counter() - start:.6f} seconds")
