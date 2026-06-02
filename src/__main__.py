@@ -120,8 +120,7 @@ while True:
     masked_logits = apply_logits_mask(logits, allowed_ids)
     next_token = int(np.argmax(masked_logits))
     tokens.append(next_token)
-    gen += model.decode(next_token)
-    print(gen)
+    gen += clean_vocab[next_token]
     if state == "FUNCTION_NAME":
         if gen in name_functions_allowed:
             schema_parameters = functions[0]["parameters"]
