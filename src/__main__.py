@@ -4,70 +4,76 @@ import numpy as np
 import json
 import time
 
-
 model = Small_LLM_Model()
 list_of_functions = {}
 
 
 def generate_prompt(functions: str, user_prompt: str) -> str:
-    prompt = 'You are AI assistant answer by using these functions tools:\n'
+    prompt = "You are AI assistant answer by using these functions tools:\n"
     prompt += f"<tools>\n{functions}\n</tools>\n"
     prompt += '<|im_start|>following this template: {"prompt": <user-prompt>, "name": <function-name>, "arguments": <args-json-object>}<|im_end|>\n'
     prompt += f"<|im_start|>user\n{user_prompt}<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n"
     prompt += "<|im_start|>If one of the parameters doesn't use it puts a default value based on it by the type of the parameter<|im_end|>\n"
-    prompt += f'{{"prompt": {user_prompt}, "name": '
+
+    safe_prompt = json.dumps(user_prompt)
+    prompt += f'{{"prompt": {safe_prompt}, "name": "'
     return prompt
 
 
 with (
-    open("/home/alamliti/goinfre/Call/Call-Me-Maybe/data/input/functions_definition.json") as functions_definition,
-    open("/home/alamliti/goinfre/Call/Call-Me-Maybe/data/input/function_calling_tests.json") as prompts,
-    # open("/home/ayoub-lec/Documents/Call-Me-Maybe/data/input/function_calling_tests.json") as p,
-    # open("/home/ayoub-lec/Documents/Call-Me-Maybe/data/input/functions_definition.json") as fun,
+    open(
+        "/home/alamliti/goinfre/Call/Call-Me-Maybe/data/input/functions_definition.json"
+    ) as functions_definition,
+    open(
+        "/home/alamliti/goinfre/Call/Call-Me-Maybe/data/input/function_calling_tests.json"
+    ) as prompts,
 ):
     objs = json.load(functions_definition)
     for obj in objs:
         list_of_functions[obj["name"]] = obj
-    prompts: dict = json.load(prompts)
+    prompts_data: dict = json.load(prompts)
     functions_tools = "\n".join(json.dumps(line) for line in objs)
 
 
-
-def get_allowed_tokens(tergets_list: list, current_string: str, clean_vocab: dict[int, str]):
-    allowed_ids = []
+def get_allowed_tokens(
+    target_list: list[str], current_string: str, clean_vocab: dict[int, str]
+) -> list[int]:
+    allowed_ids: list[int] = []
     for token_id, vocab in clean_vocab.items():
         if not vocab:
             continue
         text = current_string + vocab
-        for terget in tergets_list:
-            if terget.startswith(text):
+        for target in target_list:
+            if target.startswith(text):
                 allowed_ids.append(token_id)
                 break
     return allowed_ids
 
 
-def apply_logits_mask(logits, allowed_ids):
+def apply_logits_mask(logits, allowed_ids: list[int]):
     masked_logits = np.full_like(logits, -np.inf)
     for token_id in allowed_ids:
         masked_logits[token_id] = logits[token_id]
     return masked_logits
 
 
-def build_clean_vocab(model):
+def build_clean_vocab(model) -> dict[int, str]:
     vocab_path = model.get_path_to_vocab_file()
-    with open(vocab_path) as f:
+    with open(vocab_path, "r") as f:
         vocabulary = json.load(f)
-    clean_vocab = {}
+    clean_vocab: dict[int, str] = {}
     for _, token_id in vocabulary.items():
         clean_text = model.decode([token_id])
         clean_vocab[token_id] = clean_text
     return clean_vocab
 
 
-def get_allowed_ids_for_numbers(clean_vocab: dict[int, str]) -> list[int]:
-    allowed_ids: list = []
+def get_allowed_ids_for_numbers(
+    clean_vocab: dict[int, str], is_last: bool
+) -> list[int]:
+    allowed_ids: list[int] = []
+    allowed_chars = set("0123456789.-} ") if is_last else set("0123456789.-,} ")
 
-    allowed_chars = set("0123456789.-,} ")
     for token_id, token_text in clean_vocab.items():
         if not token_text:
             continue
@@ -75,43 +81,55 @@ def get_allowed_ids_for_numbers(clean_vocab: dict[int, str]) -> list[int]:
             allowed_ids.append(token_id)
     return allowed_ids
 
-def get_allowed_ids_for_strings(clean_vocab: dict[int, str]) -> list[int]:
+
+def get_allowed_ids_for_strings(
+    clean_vocab: dict[int, str], is_last: bool
+) -> list[int]:
     allowed_ids: list[int] = []
-    
     for token_id, token_text in clean_vocab.items():
         if not token_text:
             continue
         if "\n" in token_text or "\r" in token_text:
-            continue    
-        if '"' in token_text:
-            after_quote = token_text[token_text.find('"') + 1:]
-            if any(char not in ',} ' for char in after_quote):
+            continue
+
+        unescaped_text = token_text.replace('\\"', "")
+        if '"' in unescaped_text:
+            after_quote = unescaped_text[unescaped_text.find('"') + 1 :]
+            allowed_closing = "} " if is_last else ",} "
+            if any(char not in allowed_closing for char in after_quote):
                 continue
         allowed_ids.append(token_id)
-    return allowed_ids        
+    return allowed_ids
+
 
 clean_vocab = build_clean_vocab(model)
-parameters = model.encode('", "parameters": {')[0].tolist()
-end = model.encode('}')[0].tolist()
+parameters_injection = model.encode('", "parameters": {')[0].tolist()
+end_injection = model.encode("}")[0].tolist()
 
-print(list_of_functions)
+
 def generate_json():
-    for user_prompt in prompts:
+    for user_prompt_dict in prompts_data:
         gen = ""
         curr_key = ""
         state = "FUNCTION_NAME"
         schema_parameters = {}
         start = time.perf_counter()
-        prompt = generate_prompt(functions_tools, user_prompt["prompt"])
+
+        user_prompt = user_prompt_dict["prompt"]
+        prompt = generate_prompt(functions_tools, user_prompt)
         tokens: list = model.encode(prompt)[0].tolist()
 
         while True:
             if state == "END":
                 break
+
             logits: list = model.get_logits_from_input_ids(tokens)
+            allowed_ids = []
 
             if state == "FUNCTION_NAME":
-                allowed_ids = get_allowed_tokens(list_of_functions.keys(), gen, clean_vocab)
+                allowed_ids = get_allowed_tokens(
+                    list(list_of_functions.keys()), gen, clean_vocab
+                )
 
             elif state == "PARAM_KEYS":
                 keys = [f'"{key}": ' for key in schema_parameters.keys()]
@@ -119,29 +137,40 @@ def generate_json():
 
             elif state == "PARAM_VALUES":
                 current_type = schema_parameters[curr_key]["type"]
+                is_last_param = len(schema_parameters) == 1
+
                 if current_type == "number":
-                    allowed_ids = get_allowed_ids_for_numbers(clean_vocab)
+                    allowed_ids = get_allowed_ids_for_numbers(
+                        clean_vocab, is_last_param
+                    )
                 elif current_type == "string":
                     if gen == "":
                         allowed_ids = get_allowed_tokens(['"'], gen, clean_vocab)
                     else:
-                        allowed_ids = get_allowed_ids_for_strings(clean_vocab)
-            masked_logits = apply_logits_mask(logits, allowed_ids)
+                        allowed_ids = get_allowed_ids_for_strings(
+                            clean_vocab, is_last_param
+                        )
+
+            masked_logits = apply_logits_mask(np.array(logits), allowed_ids)
             next_token = int(np.argmax(masked_logits))
             tokens.append(next_token)
             gen += clean_vocab[next_token]
+
             if state == "FUNCTION_NAME":
-                if gen in list_of_functions.keys():
-                    schema_parameters = list_of_functions[gen]["parameters"]
-                    tokens.extend(parameters)
+                if gen in list_of_functions:
+                    schema_parameters = (
+                        list_of_functions[gen].get("parameters", {}).copy()
+                    )
+                    tokens.extend(parameters_injection)
+
                     if not schema_parameters:
-                        tokens.extend(end)
+                        tokens.extend(end_injection)
                         state = "END"
                     else:
                         gen = ""
                         state = "PARAM_KEYS"
 
-            if state == "PARAM_KEYS":
+            elif state == "PARAM_KEYS":
                 target_keys = [f'"{key}": ' for key in schema_parameters.keys()]
                 if gen in target_keys:
                     curr_key = gen.split('"')[1]
@@ -151,12 +180,17 @@ def generate_json():
             elif state == "PARAM_VALUES":
                 current_type = schema_parameters[curr_key]["type"]
                 is_value_complete = False
+
                 if current_type == "number":
                     if "," in gen or "}" in gen:
                         is_value_complete = True
+
                 elif current_type == "string":
-                    if gen.count('"') >= 2 and ("," in gen.split('"')[-1] or "}" in gen.split('"')[-1]):
+                    if gen.count('"') >= 2 and (
+                        "," in gen.split('"')[-1] or "}" in gen.split('"')[-1]
+                    ):
                         is_value_complete = True
+
                 if is_value_complete:
                     if "," in gen:
                         del schema_parameters[curr_key]
@@ -165,10 +199,26 @@ def generate_json():
                     elif "}" in gen:
                         state = "END"
 
-        result = model.decode(tokens)
+        result_raw = model.decode(tokens)
         print(f"Execution time: {time.perf_counter() - start:.6f} seconds")
-        result = result[result.find(f'{{"prompt": {user_prompt}'):]
-        print(result.count("{") == result.count("}"))
-        print(result)
 
-generate_json()
+        try:
+            json_start_index = result_raw.find(f'{{"prompt": "{user_prompt}"')
+            if json_start_index == -1:
+                raise ValueError("JSON start object not found.")
+
+            clean_json_str = result_raw[json_start_index:]
+            parsed_json = json.loads(clean_json_str)
+
+            print("[+] VALID JSON GENERATED:")
+            pprint(parsed_json)
+
+        except (json.JSONDecodeError, ValueError) as e:
+            print("[-] CRITICAL ERROR: Invalid JSON Generated!")
+            print(f"Error details: {e}")
+        print("-" * 50)
+
+if __name__ == "__main__":
+    start = time.perf_counter() 
+    generate_json()
+    print(f"Total of execution time: {time.perf_counter() - start:.6f} seconds")
