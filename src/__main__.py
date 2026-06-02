@@ -3,10 +3,10 @@ from pprint import pprint
 import numpy as np
 import json
 import time
+
+
 model = Small_LLM_Model()
 
-
-# 
 user = "What is the sum of 235 and 335?"
 functions = [{"name": "fn_calculator_numbers", "description": "calculate two numbers are required together and type of opration are required and return their result.",
               "parameters": {"a": {"type": "number"}, "b": {"type": "number"}, "c": {"type": "string"}}, "returns": {"type": "number"}}]
