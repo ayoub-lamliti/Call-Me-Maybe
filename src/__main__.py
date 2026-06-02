@@ -65,11 +65,11 @@ name_functions_allowed = [fun["name"] for fun in functions]
 
 pramas = [p for p in functions[0]["parameters"].keys()]
 
+parameters = model.encode('", "parameters": ')[0].tolist()
 gen = ""
 curr_key = ""
 state = "FUNCTION_NAME"
 
-parameters = model.encode('", "parameters": {')[0].tolist()
 end = model.encode('}')[0].tolist()
 schema_parameters = {}
 
@@ -103,14 +103,17 @@ while True:
     
     if state == "FUNCTION_NAME":
         if gen in name_functions_allowed:
-            tokens.extend(parameters)
             json_result += '", "parameters": {'
             schema_parameters = functions[0]["parameters"]
+            tokens.extend(parameters)
             # print(schema_parameters)
             if not schema_parameters:
                 tokens.extend(end)
                 state = "END"
             else:
+                # keys = [k for k in schema_parameters.keys()]
+                # curr_key = keys[0]
+                # tokens.extend(model.encode(f'", "parameters": {{"{curr_key}": ')[0].tolist())
                 gen = ""
                 state = "PARAM_KEYS"
 
@@ -118,7 +121,6 @@ while True:
         for key in schema_parameters.keys():
             curr_key = key
             keys_encode = model.encode(f'"{key}": ')[0].tolist()
-            print(keys_encode, key)
             tokens.extend(keys_encode)
             state = "PARAM_VALUES"
             gen = ""
@@ -132,10 +134,9 @@ while True:
         elif "}" in gen:
             tokens.extend(end)
             state = "END"
-# comment test
 
-result = model.decode(tokens)
 print(f"Execution time: {time.perf_counter() - start:.6f} seconds")
+result = model.decode(tokens)
 print(json_result.count("{") == json_result.count("}"))
 print(json_result)
 print(result)
