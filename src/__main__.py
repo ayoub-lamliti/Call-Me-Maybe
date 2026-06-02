@@ -14,18 +14,18 @@ def generate_prompt(functions: str, user_prompt: str) -> str:
     prompt += '<|im_start|>following this template: {"prompt": <user-prompt>, "name": <function-name>, "arguments": <args-json-object>}<|im_end|>\n'
     prompt += f"<|im_start|>user\n{user_prompt}<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n"
     prompt += "<|im_start|>If one of the parameters doesn't use it puts a default value based on it by the type of the parameter<|im_end|>\n"
-
-    safe_prompt = json.dumps(user_prompt)
-    prompt += f'{{"prompt": {safe_prompt}, "name": "'
+    prompt += f'{{"prompt": {user_prompt}, "name": "'
     return prompt
 
 
 with (
     open(
-        "/home/alamliti/goinfre/Call/Call-Me-Maybe/data/input/functions_definition.json"
+        # "/home/alamliti/goinfre/Call/Call-Me-Maybe/data/input/functions_definition.json"
+        "/home/ayoub-lec/Documents/test-call/data/input/functions_definition.json"
     ) as functions_definition,
     open(
-        "/home/alamliti/goinfre/Call/Call-Me-Maybe/data/input/function_calling_tests.json"
+        # "/home/alamliti/goinfre/Call/Call-Me-Maybe/data/input/function_calling_tests.json"
+        "/home/ayoub-lec/Documents/test-call/data/input/function_calling_tests.json"
     ) as prompts,
 ):
     objs = json.load(functions_definition)
@@ -72,7 +72,8 @@ def get_allowed_ids_for_numbers(
     clean_vocab: dict[int, str], is_last: bool
 ) -> list[int]:
     allowed_ids: list[int] = []
-    allowed_chars = set("0123456789.-} ") if is_last else set("0123456789.-,} ")
+    allowed_chars = set(
+        "0123456789.-} ") if is_last else set("0123456789.-,} ")
 
     for token_id, token_text in clean_vocab.items():
         if not token_text:
@@ -94,7 +95,7 @@ def get_allowed_ids_for_strings(
 
         unescaped_text = token_text.replace('\\"', "")
         if '"' in unescaped_text:
-            after_quote = unescaped_text[unescaped_text.find('"') + 1 :]
+            after_quote = unescaped_text[unescaped_text.find('"') + 1:]
             allowed_closing = "} " if is_last else ",} "
             if any(char not in allowed_closing for char in after_quote):
                 continue
@@ -108,14 +109,14 @@ end_injection = model.encode("}")[0].tolist()
 
 
 def generate_json():
-    for user_prompt_dict in prompts_data:
+    for user_prompt in prompts_data:
         gen = ""
         curr_key = ""
         state = "FUNCTION_NAME"
         schema_parameters = {}
         start = time.perf_counter()
 
-        user_prompt = user_prompt_dict["prompt"]
+        user_prompt = json.dumps(user_prompt["prompt"])
         prompt = generate_prompt(functions_tools, user_prompt)
         tokens: list = model.encode(prompt)[0].tolist()
 
@@ -145,7 +146,8 @@ def generate_json():
                     )
                 elif current_type == "string":
                     if gen == "":
-                        allowed_ids = get_allowed_tokens(['"'], gen, clean_vocab)
+                        allowed_ids = get_allowed_tokens(
+                            ['"'], gen, clean_vocab)
                     else:
                         allowed_ids = get_allowed_ids_for_strings(
                             clean_vocab, is_last_param
@@ -171,7 +173,8 @@ def generate_json():
                         state = "PARAM_KEYS"
 
             elif state == "PARAM_KEYS":
-                target_keys = [f'"{key}": ' for key in schema_parameters.keys()]
+                target_keys = [
+                    f'"{key}": ' for key in schema_parameters.keys()]
                 if gen in target_keys:
                     curr_key = gen.split('"')[1]
                     gen = ""
@@ -203,7 +206,7 @@ def generate_json():
         print(f"Execution time: {time.perf_counter() - start:.6f} seconds")
 
         try:
-            json_start_index = result_raw.find(f'{{"prompt": "{user_prompt}"')
+            json_start_index = result_raw.find(f'{{"prompt": {user_prompt}')
             if json_start_index == -1:
                 raise ValueError("JSON start object not found.")
 
@@ -218,7 +221,9 @@ def generate_json():
             print(f"Error details: {e}")
         print("-" * 50)
 
+
 if __name__ == "__main__":
-    start = time.perf_counter() 
+    start = time.perf_counter()
     generate_json()
-    print(f"Total of execution time: {time.perf_counter() - start:.6f} seconds")
+    print(
+        f"Total of execution time: {time.perf_counter() - start:.6f} seconds")
