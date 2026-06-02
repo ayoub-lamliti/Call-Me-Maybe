@@ -76,22 +76,18 @@ def get_allowed_ids_for_strings(clean_vocab: dict[int, str]) -> list[int]:
         allowed_ids.append(token_id)
     return allowed_ids        
 
-tokens: list = model.encode(prompt)[0].tolist()
 clean_vocab = build_clean_vocab(model)
-with open(model.get_path_to_vocab_file()) as f:
-    voc = f.read()
-
+tokens: list = model.encode(prompt)[0].tolist()
 name_functions_allowed = [fun["name"] for fun in functions]
-
 parameters = model.encode('", "parameters": {')[0].tolist()
+end = model.encode('}')[0].tolist()
 gen = ""
 curr_key = ""
 state = "FUNCTION_NAME"
-
-end = model.encode('}')[0].tolist()
 schema_parameters = {}
-
 start = time.perf_counter()
+
+
 while True:
     if state == "END":
         break
