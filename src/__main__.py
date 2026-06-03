@@ -72,8 +72,7 @@ def get_allowed_ids_for_numbers(
     clean_vocab: dict[int, str], is_last: bool
 ) -> list[int]:
     allowed_ids: list[int] = []
-    allowed_chars = set(
-        "0123456789.-} ") if is_last else set("0123456789.-,} ")
+    allowed_chars = set("0123456789.-} ") if is_last else set("0123456789.-,} ")
 
     for token_id, token_text in clean_vocab.items():
         if not token_text:
@@ -95,12 +94,23 @@ def get_allowed_ids_for_strings(
 
         unescaped_text = token_text.replace('\\"', "")
         if '"' in unescaped_text:
-            after_quote = unescaped_text[unescaped_text.find('"') + 1:]
+            after_quote = unescaped_text[unescaped_text.find('"') + 1 :]
             allowed_closing = "} " if is_last else ",} "
             if any(char not in allowed_closing for char in after_quote):
                 continue
         allowed_ids.append(token_id)
     return allowed_ids
+
+
+def get_allowed_ids_for_booleans(
+    clean_vocab: dict[int, str], gen: str, is_last: bool
+) -> list[int]:
+    if is_last:
+        target_list = ["true}", "false}", "true }", "false }"]
+    else:
+        target_list = ["true,", "false,", "true ,", "false ,"]
+
+    return get_allowed_tokens(target_list, gen, clean_vocab)
 
 
 clean_vocab = build_clean_vocab(model)
@@ -146,12 +156,13 @@ def generate_json():
                     )
                 elif current_type == "string":
                     if gen == "":
-                        allowed_ids = get_allowed_tokens(
-                            ['"'], gen, clean_vocab)
+                        allowed_ids = get_allowed_tokens(['"'], gen, clean_vocab)
                     else:
                         allowed_ids = get_allowed_ids_for_strings(
                             clean_vocab, is_last_param
                         )
+                elif current_type == "boolean":
+                    allowed_ids = get_allowed_ids_for_booleans(clean_vocab, gen, is_last_param)
 
             masked_logits = apply_logits_mask(np.array(logits), allowed_ids)
             next_token = int(np.argmax(masked_logits))
@@ -173,8 +184,7 @@ def generate_json():
                         state = "PARAM_KEYS"
 
             elif state == "PARAM_KEYS":
-                target_keys = [
-                    f'"{key}": ' for key in schema_parameters.keys()]
+                target_keys = [f'"{key}": ' for key in schema_parameters.keys()]
                 if gen in target_keys:
                     curr_key = gen.split('"')[1]
                     gen = ""
@@ -225,5 +235,4 @@ def generate_json():
 if __name__ == "__main__":
     start = time.perf_counter()
     generate_json()
-    print(
-        f"Total of execution time: {time.perf_counter() - start:.6f} seconds")
+    print(f"Total of execution time: {time.perf_counter() - start:.6f} seconds")
