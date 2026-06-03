@@ -194,13 +194,14 @@ def generate_json():
                 current_type = schema_parameters[curr_key]["type"]
                 is_value_complete = False
 
-                if current_type == "number":
+                if current_type in ["number", "boolean"]:
                     if "," in gen or "}" in gen:
                         is_value_complete = True
 
                 elif current_type == "string":
-                    if gen.count('"') >= 2 and (
-                        "," in gen.split('"')[-1] or "}" in gen.split('"')[-1]
+                    clean_gen = gen.replace('\\"', '')
+                    if clean_gen.count('"') >= 2 and (
+                        "," in clean_gen.split('"')[-1] or "}" in clean_gen.split('"')[-1]
                     ):
                         is_value_complete = True
 
