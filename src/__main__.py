@@ -20,12 +20,12 @@ def generate_prompt(functions: str, user_prompt: str) -> str:
 
 with (
     open(
-        # "/home/alamliti/goinfre/Call/Call-Me-Maybe/data/input/functions_definition.json"
-        "/home/ayoub-lec/Documents/test-call/data/input/functions_definition.json"
+        "/home/alamliti/goinfre/Call/Call-Me-Maybe/data/input/functions_definition.json"
+        # "/home/ayoub-lec/Documents/test-call/data/input/functions_definition.json"
     ) as functions_definition,
     open(
-        # "/home/alamliti/goinfre/Call/Call-Me-Maybe/data/input/function_calling_tests.json"
-        "/home/ayoub-lec/Documents/test-call/data/input/function_calling_tests.json"
+        "/home/alamliti/goinfre/Call/Call-Me-Maybe/data/input/function_calling_tests.json"
+        # "/home/ayoub-lec/Documents/test-call/data/input/function_calling_tests.json"
     ) as prompts,
 ):
     objs = json.load(functions_definition)
@@ -202,8 +202,8 @@ def generate_json():
                     elif "}" in gen:
                         state = "END"
 
-        result_raw = model.decode(tokens)
         print(f"Execution time: {time.perf_counter() - start:.6f} seconds")
+        result_raw = model.decode(tokens)
 
         try:
             json_start_index = result_raw.find(f'{{"prompt": {user_prompt}')
