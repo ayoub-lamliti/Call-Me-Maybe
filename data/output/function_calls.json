@@ -1,5 +1,14 @@
 [
     {
+        "prompt": "Replace all vowels in the string 'C:\\Windows\\\"System32\"\\config.sys' with asterisks",
+        "name": "fn_substitute_string_with_regex",
+        "parameters": {
+            "source_string": "C:\\Windows\\\"System32\"\\config.sys",
+            "regex": "vowel",
+            "replacement": "asterisk"
+        }
+    },
+    {
         "prompt": "What is the sum of 2 and 3?",
         "name": "fn_add_numbers",
         "parameters": {
