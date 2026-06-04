@@ -8,22 +8,14 @@ import os
 
 
 def generate_prompt(functions: str, user_prompt: str) -> str:
-    prompt = "You are an expert AI assistant that strictly follows instructions and uses tools perfectly.\n"
+    prompt = "You are AI assistant answer by using these functions tools:\n"
     prompt += f"<tools>\n{functions}\n</tools>\n"
-    prompt += "CRITICAL INSTRUCTIONS:\n"
-
-    prompt += "- Be extremely precise with strings, regex patterns, and replacements.\n"
-    prompt += "- Account for case sensitivity (e.g., both upper and lower case vowels if applicable).\n"
-    prompt += (
-        "- If a parameter is not used, provide a default value based on its type.\n"
-    )
-    # prompt += "<think>\n\n</think>\n"
-
     prompt += '<|im_start|>following this template: {"prompt": <user-prompt>, "name": <function-name>, "arguments": <args-json-object>}<|im_end|>\n'
-    prompt += f"<|im_start|>user\n{user_prompt}<|im_end|>\n<|im_start|>assistant\n"
+    prompt += "<|im_start|>If one of the parameters doesn't use it puts a default value based on it by the type of the parameter<|im_end|>\n"
+    prompt += f"<|im_start|>user\n{user_prompt}<|im_end|>\n"
+    prompt += "\n<|im_start|>assistant\n"
     prompt += f'{{"prompt": {user_prompt}, "name": "'
     return prompt
-
 
 def get_allowed_tokens(
     target_list: list[str], current_string: str, clean_vocab: dict[int, str]
@@ -64,7 +56,7 @@ def get_allowed_ids_for_numbers(
     allowed_ids: list[int] = []
     allowed_chars = set("0123456789.-} ") if is_last else set("0123456789.-, ")
     for token_id, token_text in clean_vocab.items():
-        if not token_text:
+        if not token_text or token_text.count("}") > 1 or token_text.count(",") > 1:
             continue
         if all(char in allowed_chars for char in token_text):
             allowed_ids.append(token_id)
@@ -266,7 +258,7 @@ def main():
         json.dump(final_results, f, indent=4)
 
     print(f"\n[+] Processing Complete!")
-    print(f"[+] Total execution time: {time.perf_counter() - total_start:.2f} seconds")
+    print(f"[+] Total execution time: {((time.perf_counter() - total_start) / 60):.2f} minutes")
     print(f"[+] Results successfully saved to: {args.output}")
 
 
