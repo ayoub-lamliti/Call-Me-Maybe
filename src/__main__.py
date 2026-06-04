@@ -78,6 +78,8 @@ def get_allowed_ids_for_strings(
             allowed_closing = "} " if is_last else ", "
             if any(char not in allowed_closing for char in after_quote):
                 continue
+            if after_quote.count("}") > 1 or after_quote.count(",") > 1:
+                continue
         allowed_ids.append(token_id)
     return allowed_ids
 

@@ -1,5 +1,8 @@
 [
   {
+    "prompt": "Replace all vowels in the string 'C:\\Windows\\\"System32\"\\config.sys' with asterisks"
+  },
+  {
     "prompt": "What is the sum of 2 and 3?"
   },
   {
