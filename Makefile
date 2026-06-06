@@ -3,7 +3,6 @@ install:
 
 run:
 	@uv run python -m src
-	echo "running..."
 
 debug:
 	@uv run python -m pdb src/__main__.py
