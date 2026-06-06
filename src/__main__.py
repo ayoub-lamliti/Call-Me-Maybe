@@ -173,8 +173,6 @@ def main() -> None:
 
         safe_user_prompt = json.dumps(raw_prompt_text)
         prompt = generate_prompt(functions_tools, safe_user_prompt)
-        print(prompt)
-        exit()
         tokens = model.encode(prompt)[0].tolist()
 
         while True:
