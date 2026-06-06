@@ -1,157 +1,23 @@
 from llm_sdk import Small_LLM_Model  # type: ignore[attr-defined]
 import numpy as np
-import argparse
 import json
 import time
-import sys
 import os
-
-
-def generate_prompt(functions: str, user_prompt: str) -> str:
-    prompt = "You are AI assistant answer by using these functions tools:\n"
-    prompt += f"<tools>\n{functions}\n</tools>\n"
-
-    prompt += "CRITICAL INSTRUCTIONS:\n"
-    prompt += "- Be extremely precise with strings and regex patterns.\n"
-    prompt += (
-        "- For regex matching letters (like vowels), ALWAYS"
-        "include both uppercase and lowercase variations"
-        "(e.g., [aeiouAEIOU]).\n"
-    )
-    prompt += (
-        "- REPLACEMENT RULE: When replacing text with a symbol,"
-        "NEVER use multiple characters. Always use a SINGLE character"
-        "(e.g., '*' not '**'), even if the prompt uses plural words"
-        "like 'asterisks'.\n"
-    )
-    prompt += (
-        "- If a parameter is not used, provide a default value based"
-        "on its type.\n"
-    )
-
-    prompt += (
-        '<|im_start|>following this template: {"prompt": <user-prompt>,'
-        '"name": <function-name>, "arguments": <args-json-object>}<|im_end|>\n'
-    )
-    prompt += f"<|im_start|>user\n{user_prompt}<|im_end|>\n"
-    prompt += "<|im_start|>assistant\n"
-    prompt += f'{{"prompt": {user_prompt}, "name": "'
-    return prompt
-
-
-def get_allowed_tokens(
-    target_list: list[str], current_string: str, clean_vocab: dict[int, str]
-) -> list[int]:
-    allowed_ids: list[int] = []
-    for token_id, vocab in clean_vocab.items():
-        if not vocab:
-            continue
-        text = current_string + vocab
-        for target in target_list:
-            if target.startswith(text):
-                allowed_ids.append(token_id)
-                break
-    return allowed_ids
-
-
-def apply_logits_mask(logits: list, allowed_ids: list[int]) -> np.ndarray:
-    masked_logits = np.full_like(logits, -np.inf)
-    for token_id in allowed_ids:
-        masked_logits[token_id] = logits[token_id]
-    return masked_logits
-
-
-def build_clean_vocab(model: Small_LLM_Model) -> dict[int, str]:
-    vocab_path = model.get_path_to_vocab_file()
-    with open(vocab_path, "r") as f:
-        vocabulary = json.load(f)
-    clean_vocab: dict[int, str] = {}
-    for _, token_id in vocabulary.items():
-        clean_text = model.decode([token_id])
-        clean_vocab[token_id] = clean_text
-    return clean_vocab
-
-
-def get_allowed_ids_for_numbers(
-    clean_vocab: dict[int, str], is_last: bool
-) -> list[int]:
-    allowed_ids: list[int] = []
-    allowed_chars = set("0123456789.-} ") if is_last else set("0123456789.-, ")
-    for token_id, token_text in clean_vocab.items():
-        if (not token_text or token_text.count("}") > 1
-                or token_text.count(",") > 1):
-            continue
-        if all(char in allowed_chars for char in token_text):
-            allowed_ids.append(token_id)
-    return allowed_ids
-
-
-def get_allowed_ids_for_strings(
-    clean_vocab: dict[int, str], is_last: bool
-) -> list[int]:
-    allowed_ids: list[int] = []
-    for token_id, token_text in clean_vocab.items():
-        if not token_text:
-            continue
-        if "\n" in token_text or "\r" in token_text:
-            continue
-        unescaped_text = token_text.replace('\\"', "")
-        if '"' in unescaped_text:
-            after_quote = unescaped_text[unescaped_text.find('"') + 1:]
-            allowed_closing = "} " if is_last else ", "
-            if any(char not in allowed_closing for char in after_quote):
-                continue
-            if after_quote.count("}") > 1 or after_quote.count(",") > 1:
-                continue
-        allowed_ids.append(token_id)
-    return allowed_ids
-
-
-def get_allowed_ids_for_booleans(
-    clean_vocab: dict[int, str], gen: str, is_last: bool
-) -> list[int]:
-    if is_last:
-        target_list = ["true}", "false}", "true }", "false }"]
-    else:
-        target_list = ["true,", "false,", "true ,", "false ,"]
-    return get_allowed_tokens(target_list, gen, clean_vocab)
+from .parsing import parse_arguments, parse_input_files
+from .prompting import generate_prompt
+from .decoding import (
+    build_clean_vocab,
+    get_allowed_tokens,
+    get_allowed_ids_for_numbers,
+    get_allowed_ids_for_strings,
+    get_allowed_ids_for_booleans,
+    apply_logits_mask,
+)
 
 
 def main() -> None:
-
-    parser = argparse.ArgumentParser(
-        description="LLM Function Calling Inference")
-    parser.add_argument(
-        "--functions_definition",
-        type=str,
-        default="data/input/functions_definition.json",
-        help="Path to functions definition JSON",
-    )
-    parser.add_argument(
-        "--input",
-        type=str,
-        default="data/input/function_calling_tests.json",
-        help="Path to prompts JSON",
-    )
-    parser.add_argument(
-        "--output",
-        type=str,
-        default="data/output/function_calls.json",
-        help="Path to save the output JSON",
-    )
-    args = parser.parse_args()
-
-    try:
-        with open(args.functions_definition, "r") as f:
-            objs = json.load(f)
-            list_of_functions = {obj["name"]: obj for obj in objs}
-            functions_tools = "\n".join(json.dumps(line) for line in objs)
-
-        with open(args.input, "r") as f:
-            prompts_data = json.load(f)
-    except Exception as e:
-        print(f"[-] Error loading input files: {e}")
-        sys.exit(1)
+    args = parse_arguments()
+    list_of_functions, functions_tools, prompts_data = parse_input_files(args)
 
     print("[*] Loading Model...")
     model = Small_LLM_Model()
@@ -199,8 +65,8 @@ def main() -> None:
                     )
                 elif current_type == "string":
                     if gen == "":
-                        allowed_ids = get_allowed_tokens(
-                            ['"'], gen, clean_vocab)
+                        allowed_ids = get_allowed_tokens(['"'],
+                                                         gen, clean_vocab)
                     else:
                         allowed_ids = get_allowed_ids_for_strings(
                             clean_vocab, is_last_param
@@ -292,7 +158,7 @@ def main() -> None:
     print("\n[+] Processing Complete!")
     print(
         "[+] Total execution time: ",
-        f"{((time.perf_counter() - total_start) / 60):.2f} minutes"
+        f"{((time.perf_counter() - total_start) / 60):.2f} minutes",
     )
     print(f"[+] Results successfully saved to: {args.output}")
 
