@@ -1,4 +1,4 @@
-from llm_sdk import Small_LLM_Model
+from llm_sdk import Small_LLM_Model  # type: ignore[attr-defined]
 import numpy as np
 import argparse
 import json
@@ -13,15 +13,31 @@ def generate_prompt(functions: str, user_prompt: str) -> str:
 
     prompt += "CRITICAL INSTRUCTIONS:\n"
     prompt += "- Be extremely precise with strings and regex patterns.\n"
-    prompt += "- For regex matching letters (like vowels), ALWAYS include both uppercase and lowercase variations (e.g., [aeiouAEIOU]).\n"
-    prompt += "- REPLACEMENT RULE: When replacing text with a symbol, NEVER use multiple characters. Always use a SINGLE character (e.g., '*' not '**'), even if the prompt uses plural words like 'asterisks'.\n"
-    prompt += "- If a parameter is not used, provide a default value based on its type.\n"
+    prompt += (
+        "- For regex matching letters (like vowels), ALWAYS"
+        "include both uppercase and lowercase variations"
+        "(e.g., [aeiouAEIOU]).\n"
+    )
+    prompt += (
+        "- REPLACEMENT RULE: When replacing text with a symbol,"
+        "NEVER use multiple characters. Always use a SINGLE character"
+        "(e.g., '*' not '**'), even if the prompt uses plural words"
+        "like 'asterisks'.\n"
+    )
+    prompt += (
+        "- If a parameter is not used, provide a default value based"
+        "on its type.\n"
+    )
 
-    prompt += '<|im_start|>following this template: {"prompt": <user-prompt>, "name": <function-name>, "arguments": <args-json-object>}<|im_end|>\n'
+    prompt += (
+        '<|im_start|>following this template: {"prompt": <user-prompt>,'
+        '"name": <function-name>, "arguments": <args-json-object>}<|im_end|>\n'
+    )
     prompt += f"<|im_start|>user\n{user_prompt}<|im_end|>\n"
-    prompt += "\n<|im_start|>assistant\n"
+    prompt += "<|im_start|>assistant\n"
     prompt += f'{{"prompt": {user_prompt}, "name": "'
     return prompt
+
 
 def get_allowed_tokens(
     target_list: list[str], current_string: str, clean_vocab: dict[int, str]
@@ -38,14 +54,14 @@ def get_allowed_tokens(
     return allowed_ids
 
 
-def apply_logits_mask(logits, allowed_ids: list[int]):
+def apply_logits_mask(logits: list, allowed_ids: list[int]) -> np.ndarray:
     masked_logits = np.full_like(logits, -np.inf)
     for token_id in allowed_ids:
         masked_logits[token_id] = logits[token_id]
     return masked_logits
 
 
-def build_clean_vocab(model) -> dict[int, str]:
+def build_clean_vocab(model: Small_LLM_Model) -> dict[int, str]:
     vocab_path = model.get_path_to_vocab_file()
     with open(vocab_path, "r") as f:
         vocabulary = json.load(f)
@@ -62,7 +78,8 @@ def get_allowed_ids_for_numbers(
     allowed_ids: list[int] = []
     allowed_chars = set("0123456789.-} ") if is_last else set("0123456789.-, ")
     for token_id, token_text in clean_vocab.items():
-        if not token_text or token_text.count("}") > 1 or token_text.count(",") > 1:
+        if (not token_text or token_text.count("}") > 1
+                or token_text.count(",") > 1):
             continue
         if all(char in allowed_chars for char in token_text):
             allowed_ids.append(token_id)
@@ -80,7 +97,7 @@ def get_allowed_ids_for_strings(
             continue
         unescaped_text = token_text.replace('\\"', "")
         if '"' in unescaped_text:
-            after_quote = unescaped_text[unescaped_text.find('"') + 1 :]
+            after_quote = unescaped_text[unescaped_text.find('"') + 1:]
             allowed_closing = "} " if is_last else ", "
             if any(char not in allowed_closing for char in after_quote):
                 continue
@@ -100,9 +117,10 @@ def get_allowed_ids_for_booleans(
     return get_allowed_tokens(target_list, gen, clean_vocab)
 
 
-def main():
+def main() -> None:
 
-    parser = argparse.ArgumentParser(description="LLM Function Calling Inference")
+    parser = argparse.ArgumentParser(
+        description="LLM Function Calling Inference")
     parser.add_argument(
         "--functions_definition",
         type=str,
@@ -141,27 +159,29 @@ def main():
     parameters_injection = model.encode('", "parameters": {')[0].tolist()
     end_injection = model.encode("}")[0].tolist()
 
-    final_results = []
+    final_results: list = []
     total_start = time.perf_counter()
 
     for item in prompts_data:
         gen = ""
         curr_key = ""
         state = "FUNCTION_NAME"
-        schema_parameters = {}
+        schema_parameters: dict = {}
 
         raw_prompt_text = item["prompt"]
         print(f"[*] Processing: {raw_prompt_text}")
 
         safe_user_prompt = json.dumps(raw_prompt_text)
         prompt = generate_prompt(functions_tools, safe_user_prompt)
-        tokens: list = model.encode(prompt)[0].tolist()
+        print(prompt)
+        exit()
+        tokens = model.encode(prompt)[0].tolist()
 
         while True:
             if state == "END":
                 break
 
-            logits: list = model.get_logits_from_input_ids(tokens)
+            logits = model.get_logits_from_input_ids(tokens)
             allowed_ids = []
 
             if state == "FUNCTION_NAME":
@@ -181,7 +201,8 @@ def main():
                     )
                 elif current_type == "string":
                     if gen == "":
-                        allowed_ids = get_allowed_tokens(['"'], gen, clean_vocab)
+                        allowed_ids = get_allowed_tokens(
+                            ['"'], gen, clean_vocab)
                     else:
                         allowed_ids = get_allowed_ids_for_strings(
                             clean_vocab, is_last_param
@@ -210,7 +231,8 @@ def main():
                         gen = ""
                         state = "PARAM_KEYS"
             elif state == "PARAM_KEYS":
-                target_keys = [f'"{key}": ' for key in schema_parameters.keys()]
+                target_keys = [
+                    f'"{key}": ' for key in schema_parameters.keys()]
                 if gen in target_keys:
                     curr_key = gen.split('"')[1]
                     gen = ""
@@ -242,7 +264,8 @@ def main():
         result_raw = model.decode(tokens)
 
         try:
-            json_start_index = result_raw.find(f'{{"prompt": {safe_user_prompt}')
+            json_start_index = result_raw.find(
+                f'{{"prompt": {safe_user_prompt}')
             if json_start_index == -1:
                 raise ValueError("JSON start object not found.")
 
@@ -250,11 +273,14 @@ def main():
             parsed_json = json.loads(clean_json_str)
             func_name = parsed_json.get("name")
             if func_name in list_of_functions:
-                original_schema = list_of_functions[func_name].get("parameters", {})
-
-                for param_key, param_value in parsed_json.get("parameters", {}).items():
-                    if original_schema.get(param_key, {}).get("type") == "number":
-                        parsed_json["parameters"][param_key] = float(param_value)
+                original_schema = list_of_functions[func_name].get(
+                    "parameters", {})
+                for param_key, param_value in parsed_json.get(
+                        "parameters", {}).items():
+                    if original_schema.get(param_key, {}).get(
+                            "type") == "number":
+                        parsed_json["parameters"][param_key] = float(
+                            param_value)
             final_results.append(parsed_json)
 
         except (json.JSONDecodeError, ValueError) as e:
@@ -265,8 +291,11 @@ def main():
     with open(args.output, "w") as f:
         json.dump(final_results, f, indent=4)
 
-    print(f"\n[+] Processing Complete!")
-    print(f"[+] Total execution time: {((time.perf_counter() - total_start) / 60):.2f} minutes")
+    print("\n[+] Processing Complete!")
+    print(
+        "[+] Total execution time: ",
+        f"{((time.perf_counter() - total_start) / 60):.2f} minutes"
+    )
     print(f"[+] Results successfully saved to: {args.output}")
 
 
