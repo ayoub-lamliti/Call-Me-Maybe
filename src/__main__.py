@@ -27,7 +27,7 @@ def main() -> None:
 
     final_results: list = []
     total_start = time.perf_counter()
-
+    flag = True
     for item in prompts_data:
         gen = ""
         curr_key = ""
@@ -44,8 +44,8 @@ def main() -> None:
         while True:
             if state == "END":
                 break
-
-            logits = model.get_logits_from_input_ids(tokens)
+            if flag:
+                logits = model.get_logits_from_input_ids(tokens)
             allowed_ids = []
 
             if state == "FUNCTION_NAME":
@@ -53,13 +53,17 @@ def main() -> None:
                     list(list_of_functions.keys()), gen, clean_vocab
                 )
             elif state == "PARAM_KEYS":
-                keys = [f'"{key}": ' for key in schema_parameters.keys()]
-                allowed_ids = get_allowed_tokens(keys, gen, clean_vocab)
+                for key in schema_parameters.keys():
+                    tokens.extend(model.encode(f'"{key}": ')[0].tolist())
+                    flag = False
+                    curr_key = key
+                    state = "PARAM_VALUES"
+                    break
             elif state == "PARAM_VALUES":
                 current_type = schema_parameters[curr_key]["type"]
                 is_last_param = len(schema_parameters) == 1
 
-                if current_type == "number":
+                if current_type in ["number", "integer"]:
                     allowed_ids = get_allowed_ids_for_numbers(
                         clean_vocab, is_last_param
                     )
@@ -76,12 +80,14 @@ def main() -> None:
                         clean_vocab, gen, is_last_param
                     )
 
-            masked_logits = apply_logits_mask(np.array(logits), allowed_ids)
-            next_token = int(np.argmax(masked_logits))
-            tokens.append(next_token)
-            gen += clean_vocab[next_token]
+            if flag:
+                masked_logits = apply_logits_mask(np.array(logits), allowed_ids)
+                next_token = int(np.argmax(masked_logits))
+                tokens.append(next_token)
+                gen += clean_vocab[next_token]
 
             if state == "FUNCTION_NAME":
+                print(gen)
                 if gen in list_of_functions:
                     schema_parameters = (
                         list_of_functions[gen].get("parameters", {}).copy()
@@ -94,20 +100,16 @@ def main() -> None:
                     else:
                         gen = ""
                         state = "PARAM_KEYS"
-            elif state == "PARAM_KEYS":
-                target_keys = [
-                    f'"{key}": ' for key in schema_parameters.keys()]
-                if gen in target_keys:
-                    curr_key = gen.split('"')[1]
-                    gen = ""
-                    state = "PARAM_VALUES"
+                    
             elif state == "PARAM_VALUES":
                 current_type = schema_parameters[curr_key]["type"]
                 is_value_complete = False
+                flag = True
 
-                if current_type in ["number", "boolean"]:
+                if current_type in ["number", "boolean", "integer"]:
                     if "," in gen or "}" in gen:
                         is_value_complete = True
+                    ending_part = gen
                 elif current_type == "string":
                     clean_gen = gen.replace('\\"', "")
                     if clean_gen.count('"') >= 2 and (
@@ -115,6 +117,7 @@ def main() -> None:
                         or "}" in clean_gen.split('"')[-1]
                     ):
                         is_value_complete = True
+                    ending_part = clean_gen.split('"')[-1]
 
                 if is_value_complete:
                     if "," in gen:
@@ -122,11 +125,10 @@ def main() -> None:
                         gen = ""
                         state = "PARAM_KEYS" if schema_parameters else "END"
                     elif "}" in gen:
-                        tokens.extend(end_injection)
+                        if ending_part.count("}") == 1:
+                            tokens.extend(end_injection)
                         state = "END"
-
         result_raw = model.decode(tokens)
-
         try:
             json_start_index = result_raw.find(
                 f'{{"prompt": {safe_user_prompt}')
