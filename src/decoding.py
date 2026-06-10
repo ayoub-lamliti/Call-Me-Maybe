@@ -6,6 +6,8 @@ from llm_sdk import Small_LLM_Model  # type: ignore[attr-defined]
 def get_allowed_tokens(
     target_list: list[str], current_string: str, clean_vocab: dict[int, str]
 ) -> list[int]:
+    """Return token IDs whose decoded text keeps current_string a valid
+    prefix of at least one target in target_list."""
     allowed_ids: list[int] = []
     for token_id, vocab in clean_vocab.items():
         if not vocab:
@@ -19,6 +21,7 @@ def get_allowed_tokens(
 
 
 def apply_logits_mask(logits: list, allowed_ids: list[int]) -> np.ndarray:
+    """Set all logits to -inf except those in allowed_ids."""
     masked_logits = np.full_like(logits, -np.inf)
     for token_id in allowed_ids:
         masked_logits[token_id] = logits[token_id]
@@ -26,6 +29,8 @@ def apply_logits_mask(logits: list, allowed_ids: list[int]) -> np.ndarray:
 
 
 def build_clean_vocab(model: Small_LLM_Model) -> dict[int, str]:
+    """Build a mapping from token_id → decoded string for every token
+    in the model vocabulary."""
     vocab_path = model.get_path_to_vocab_file()
     with open(vocab_path, "r") as f:
         vocabulary = json.load(f)
@@ -39,6 +44,9 @@ def build_clean_vocab(model: Small_LLM_Model) -> dict[int, str]:
 def get_allowed_ids_for_numbers(
     clean_vocab: dict[int, str], is_last: bool
 ) -> list[int]:
+    """Return token IDs that are safe to emit while generating a numeric
+    JSON value.  When is_last=True the value is terminated by `}`;
+    otherwise it is terminated by `,`."""
     allowed_ids: list[int] = []
     allowed_chars = set("0123456789.-} ") if is_last else set("0123456789.-, ")
     for token_id, token_text in clean_vocab.items():
@@ -53,6 +61,9 @@ def get_allowed_ids_for_numbers(
 def get_allowed_ids_for_strings(
     clean_vocab: dict[int, str], is_last: bool
 ) -> list[int]:
+    """Return token IDs that are safe to emit while generating a string
+    JSON value.  After the closing quote only structural characters are
+    allowed.  When is_last=True the value ends with `}`; otherwise `,`."""
     allowed_ids: list[int] = []
     for token_id, token_text in clean_vocab.items():
         if not token_text:
@@ -74,6 +85,7 @@ def get_allowed_ids_for_strings(
 def get_allowed_ids_for_booleans(
     clean_vocab: dict[int, str], gen: str, is_last: bool
 ) -> list[int]:
+    """Return token IDs valid for the current partial boolean value."""
     if is_last:
         target_list = ["true}", "false}", "true }", "false }"]
     else:

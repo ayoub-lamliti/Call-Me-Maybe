@@ -1,4 +1,7 @@
 def generate_prompt(functions: str, user_prompt: str) -> str:
+    """Build the full prompt string sent to the LLM for function-call
+    generation.  The prompt primes the model to emit a JSON object whose
+    `parameters` key holds the extracted arguments."""
     prompt = "You are AI assistant answer by using these functions tools:\n"
     prompt += f"<tools>\n{functions}\n</tools>\n"
 

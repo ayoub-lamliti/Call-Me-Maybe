@@ -16,6 +16,7 @@ from .decoding import (
 
 
 def main() -> None:
+    """Entry point: load model, process all prompts, write results."""
     print("[*] Loading Model...")
     model = Small_LLM_Model()
     args = parse_arguments()
@@ -34,13 +35,12 @@ def main() -> None:
     strings_in_case_is_last = get_allowed_ids_for_strings(clean_vocab, True)
     final_results: list = []
     total_start = time.perf_counter()
-    flag = True
     for item in prompts_data:
         gen = ""
         curr_key = ""
         state = "FUNCTION_NAME"
         schema_parameters: dict = {}
-
+        flag = True
         raw_prompt_text = item["prompt"]
         print(f"[*] Processing: {raw_prompt_text}")
 
@@ -89,7 +89,7 @@ def main() -> None:
                     allowed_ids = get_allowed_ids_for_booleans(
                         clean_vocab, gen, is_last_param
                     )
-
+            next_token: int = -1
             if flag:
                 masked_logits = apply_logits_mask(
                     np.array(logits), allowed_ids)
@@ -134,12 +134,12 @@ def main() -> None:
                     ending_part = gen
                 elif current_type == "string":
                     clean_gen = gen.replace('\\"', "")
+                    ending_part = clean_gen.split('"')[-1]
                     if clean_gen.count('"') >= 2 and (
                         "," in clean_gen.split('"')[-1]
                         or "}" in clean_gen.split('"')[-1]
                     ):
                         is_value_complete = True
-                    ending_part = clean_gen.split('"')[-1]
 
                 if is_value_complete:
                     if "," in gen:
@@ -163,19 +163,32 @@ def main() -> None:
             if func_name in list_of_functions:
                 original_schema = list_of_functions[func_name].get(
                     "parameters", {})
-                for param_key, param_value in parsed_json.get(
-                        "parameters", {}).items():
-                    if original_schema.get(param_key, {}).get(
-                            "type") == "number":
+
+            for param_key, param_value in parsed_json.get(
+                    "parameters", {}).items():
+                expected_type = original_schema.get(param_key, {}).get(
+                    "type")
+                try:
+                    if expected_type == "number":
                         parsed_json["parameters"][param_key] = float(
                             param_value)
+                    elif expected_type == "integer":
+                        parsed_json["parameters"][param_key] = int(param_value)
+                except (ValueError, TypeError):
+                    pass
             final_results.append(parsed_json)
 
         except (json.JSONDecodeError, ValueError) as e:
             print(f"[-] CRITICAL ERROR on prompt: {raw_prompt_text}")
             print(f"Error details: {e}")
+            final_results.append(
+                {"prompt": raw_prompt_text, "name": None, "parameters": {}}
+            )
 
-    os.makedirs(os.path.dirname(args.output), exist_ok=True)
+    output_dir = os.path.dirname(args.output)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+
     with open(args.output, "w") as f:
         json.dump(final_results, f, indent=4)
 
