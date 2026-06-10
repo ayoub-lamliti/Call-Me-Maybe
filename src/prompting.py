@@ -25,7 +25,7 @@ def generate_prompt(functions: str, user_prompt: str) -> str:
 
     prompt += (
         '<|im_start|>following this template: {"prompt": <user-prompt>,'
-        '"name": <function-name>, "arguments": <args-json-object>}<|im_end|>\n'
+        '"name": <function-name>, "parameters": <args-json-object>}<|im_end|>\n'
     )
     prompt += f"<|im_start|>user\n{user_prompt}<|im_end|>\n"
     prompt += "<|im_start|>assistant\n"
