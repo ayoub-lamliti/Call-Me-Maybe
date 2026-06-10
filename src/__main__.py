@@ -19,13 +19,19 @@ def main() -> None:
     print("[*] Loading Model...")
     model = Small_LLM_Model()
     args = parse_arguments()
-    list_of_functions, functions_tools, prompts_data, list_of_decode_name_functions = (
-        parse_input_files(args, model)
-    )
+    (
+        list_of_functions,
+        functions_tools,
+        prompts_data,
+        list_of_decode_name_functions,
+    ) = parse_input_files(args, model)
     clean_vocab = build_clean_vocab(model)
     parameters_injection = model.encode('", "parameters": {')[0].tolist()
     end_injection = model.encode("}")[0].tolist()
-
+    numbers = get_allowed_ids_for_numbers(clean_vocab, False)
+    numbers_in_case_is_last = get_allowed_ids_for_numbers(clean_vocab, True)
+    strings = get_allowed_ids_for_strings(clean_vocab, False)
+    strings_in_case_is_last = get_allowed_ids_for_strings(clean_vocab, True)
     final_results: list = []
     total_start = time.perf_counter()
     flag = True
@@ -42,9 +48,7 @@ def main() -> None:
         prompt = generate_prompt(functions_tools, safe_user_prompt)
         tokens = model.encode(prompt)[0].tolist()
 
-        while True:
-            if state == "END":
-                break
+        while state != "END":
             if flag:
                 logits = model.get_logits_from_input_ids(tokens)
             allowed_ids = []
@@ -65,15 +69,21 @@ def main() -> None:
                 is_last_param = len(schema_parameters) == 1
 
                 if current_type in ["number", "integer"]:
-                    allowed_ids = get_allowed_ids_for_numbers(
-                        clean_vocab, is_last_param
+                    allowed_ids = (
+                        numbers_in_case_is_last if
+                        is_last_param else numbers
                     )
                 elif current_type == "string":
                     if gen == "":
-                        allowed_ids = get_allowed_tokens(['"'], gen, clean_vocab)
+                        allowed_ids = get_allowed_tokens(
+                            ['"'],
+                            gen,
+                            clean_vocab,
+                        )
                     else:
-                        allowed_ids = get_allowed_ids_for_strings(
-                            clean_vocab, is_last_param
+                        allowed_ids = (
+                            strings_in_case_is_last if
+                            is_last_param else strings
                         )
                 elif current_type == "boolean":
                     allowed_ids = get_allowed_ids_for_booleans(
@@ -81,27 +91,26 @@ def main() -> None:
                     )
 
             if flag:
-                masked_logits = apply_logits_mask(np.array(logits), allowed_ids)
+                masked_logits = apply_logits_mask(
+                    np.array(logits), allowed_ids)
                 next_token = int(np.argmax(masked_logits))
                 tokens.append(next_token)
                 gen += clean_vocab[next_token]
 
             if state == "FUNCTION_NAME":
-                reminders_of_tokens_of_function = []
-                reminders_of_functions: list[int] = [
+                remindersOfTokens = []
+                reminders_of_functions: list[list[int]] = [
                     function_encode
                     for function_encode in list_of_decode_name_functions
                     if next_token in function_encode
                 ]
                 if len(reminders_of_functions) == 1:
                     index = reminders_of_functions[0].index(next_token)
-                    reminders_of_tokens_of_function = reminders_of_functions[0][
-                        index + 1 :
-                    ]
-                if gen in list_of_functions or reminders_of_tokens_of_function:
-                    if reminders_of_tokens_of_function:
-                        tokens.extend(reminders_of_tokens_of_function)
-                        gen += model.decode(reminders_of_tokens_of_function)
+                    remindersOfTokens = reminders_of_functions[0][index + 1:]
+                if gen in list_of_functions or remindersOfTokens:
+                    if remindersOfTokens:
+                        tokens.extend(remindersOfTokens)
+                        gen += model.decode(remindersOfTokens)
                     schema_parameters = (
                         list_of_functions[gen].get("parameters", {}).copy()
                     )
@@ -143,7 +152,8 @@ def main() -> None:
                         state = "END"
         result_raw = model.decode(tokens)
         try:
-            json_start_index = result_raw.find(f'{{"prompt": {safe_user_prompt}')
+            json_start_index = result_raw.find(
+                f'{{"prompt": {safe_user_prompt}')
             if json_start_index == -1:
                 raise ValueError("JSON start object not found.")
 
@@ -151,10 +161,14 @@ def main() -> None:
             parsed_json = json.loads(clean_json_str)
             func_name = parsed_json.get("name")
             if func_name in list_of_functions:
-                original_schema = list_of_functions[func_name].get("parameters", {})
-                for param_key, param_value in parsed_json.get("parameters", {}).items():
-                    if original_schema.get(param_key, {}).get("type") == "number":
-                        parsed_json["parameters"][param_key] = float(param_value)
+                original_schema = list_of_functions[func_name].get(
+                    "parameters", {})
+                for param_key, param_value in parsed_json.get(
+                        "parameters", {}).items():
+                    if original_schema.get(param_key, {}).get(
+                            "type") == "number":
+                        parsed_json["parameters"][param_key] = float(
+                            param_value)
             final_results.append(parsed_json)
 
         except (json.JSONDecodeError, ValueError) as e:

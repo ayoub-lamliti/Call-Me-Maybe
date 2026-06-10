@@ -22,7 +22,7 @@ class Prompt(BaseModel):
 
 
 def parse_arguments() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="LLM Function Calling Inference")
+    parser = argparse.ArgumentParser()
     parser.add_argument(
         "--functions_definition",
         type=str,
@@ -43,15 +43,17 @@ def parse_arguments() -> argparse.Namespace:
 
 def parse_input_files(
     args: argparse.Namespace, model: Small_LLM_Model
-) -> tuple[dict, str, list]:
+) -> tuple[dict, str, list, list]:
     try:
         with open(args.functions_definition, "r") as f:
             raw_funcs = json.load(f)
         validated_funcs = [FunctionDefinition(**obj) for obj in raw_funcs]
-        list_of_functions = {func.name: func.model_dump() for func in validated_funcs}
+        list_of_functions = {func.name: func.model_dump()
+                             for func in validated_funcs}
         list_of_decode_name_functions = []
         for function in list_of_functions:
-            list_of_decode_name_functions.extend([model.encode(function)[0].tolist()])
+            list_of_decode_name_functions.extend(
+                [model.encode(function)[0].tolist()])
         functions_tools = "\n".join(json.dumps(obj) for obj in raw_funcs)
         with open(args.input, "r") as f:
             raw_prompts = json.load(f)
