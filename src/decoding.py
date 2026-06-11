@@ -21,11 +21,19 @@ def get_allowed_tokens(
 
 
 def apply_logits_mask(logits: list, allowed_ids: list[int]) -> np.ndarray:
-    """Set all logits to -inf except those in allowed_ids."""
-    masked_logits = np.full_like(logits, -np.inf)
-    for token_id in allowed_ids:
-        masked_logits[token_id] = logits[token_id]
-    return masked_logits
+    """
+    Modify logits IN-PLACE to keep memory footprint minimal.
+    Sets all unallowed token logits to -inf.
+    """
+    if not allowed_ids:
+        logits.fill(-np.inf)
+        return logits
+    mask = np.ones(logits.shape, dtype=bool)
+    allowed_idx = np.array(allowed_ids, dtype=np.int32)
+    mask[allowed_idx] = False 
+    logits[mask] = -np.inf
+    
+    return logits
 
 
 def build_clean_vocab(model: Small_LLM_Model) -> dict[int, str]:
