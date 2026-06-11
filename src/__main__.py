@@ -12,6 +12,7 @@ from .decoding import (
     get_allowed_ids_for_strings,
     get_allowed_ids_for_booleans,
     apply_logits_mask,
+    build_prefix_cache,
 )
 
 
@@ -27,6 +28,9 @@ def main() -> None:
         list_of_decode_name_functions,
     ) = parse_input_files(args, model)
     clean_vocab = build_clean_vocab(model)
+    print("[*] Building Prefix Cache for Function Names...")
+    prefix_cache = build_prefix_cache(
+        list(list_of_functions.keys()), clean_vocab)
     parameters_injection = model.encode('", "parameters": {')[0].tolist()
     end_injection = model.encode("}")[0].tolist()
     numbers = get_allowed_ids_for_numbers(clean_vocab, False)
@@ -54,9 +58,7 @@ def main() -> None:
             allowed_ids = []
 
             if state == "FUNCTION_NAME":
-                allowed_ids = get_allowed_tokens(
-                    list(list_of_functions.keys()), gen, clean_vocab
-                )
+                allowed_ids = prefix_cache.get(gen, [])
             elif state == "PARAM_KEYS":
                 for key in schema_parameters.keys():
                     tokens.extend(model.encode(f'"{key}": ')[0].tolist())
@@ -98,25 +100,11 @@ def main() -> None:
                 gen += clean_vocab[next_token]
 
             if state == "FUNCTION_NAME":
-                remindersOfTokens = []
-                reminders_of_functions = []
-                for function_encode in list_of_decode_name_functions:
-                    try:
-                        idx = function_encode.index(next_token)
-                        reminders_of_functions.append((function_encode, idx))
-                    except ValueError:
-                        pass
-                if len(reminders_of_functions) == 1:
-                    func, idx = reminders_of_functions[0]
-                    remindersOfTokens = func[idx + 1:]
-                if gen in list_of_functions or remindersOfTokens:
-                    if remindersOfTokens:
-                        tokens.extend(remindersOfTokens)
-                        gen += model.decode(remindersOfTokens)
-                    schema_parameters = (
-                        list_of_functions[gen].get("parameters", {}).copy()
-                    )
+                if gen in list_of_functions:
+                    schema_parameters = list_of_functions[gen].get(
+                        "parameters", {}).copy()
                     tokens.extend(parameters_injection)
+
                     if not schema_parameters:
                         tokens.extend(end_injection)
                         tokens.extend(end_injection)

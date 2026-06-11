@@ -30,9 +30,9 @@ def apply_logits_mask(logits: list, allowed_ids: list[int]) -> np.ndarray:
         return logits
     mask = np.ones(logits.shape, dtype=bool)
     allowed_idx = np.array(allowed_ids, dtype=np.int32)
-    mask[allowed_idx] = False 
+    mask[allowed_idx] = False
     logits[mask] = -np.inf
-    
+
     return logits
 
 
@@ -99,3 +99,18 @@ def get_allowed_ids_for_booleans(
     else:
         target_list = ["true,", "false,", "true ,", "false ,"]
     return get_allowed_tokens(target_list, gen, clean_vocab)
+
+
+def build_prefix_cache(
+    target_list: list[str], clean_vocab: dict[int, str]
+) -> dict[str, list[int]]:
+    """Pre-compute allowed token IDs for every possible prefix."""
+    all_prefixes: set[str] = set()
+    for target in target_list:
+        for i in range(len(target) + 1):
+            all_prefixes.add(target[:i])
+
+    cache: dict[str, list[int]] = {}
+    for prefix in all_prefixes:
+        cache[prefix] = get_allowed_tokens(target_list, prefix, clean_vocab)
+    return cache
