@@ -13,7 +13,7 @@ clean:
 	@rm -rf .mypy_cache
 	@rm -rf .pytest_cache
 	@find . -type d -name "__pycache__" -exec rm -r {} +
-	echo "all clean."
+	@echo "all clean."
 
 lint:
 	flake8 src/
