@@ -52,10 +52,9 @@ def main() -> None:
         tokens = model.encode(prompt)[0].tolist()
 
         while state != "END":
+            allowed_ids = []
             if flag:
                 logits = model.get_logits_from_input_ids(tokens)
-            allowed_ids = []
-
             if state == "FUNCTION_NAME":
                 allowed_ids = prefix_cache.get(gen, [])
             elif state == "PARAM_KEYS":
