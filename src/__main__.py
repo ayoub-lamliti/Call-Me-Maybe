@@ -99,14 +99,16 @@ def main() -> None:
 
             if state == "FUNCTION_NAME":
                 remindersOfTokens = []
-                reminders_of_functions: list[list[int]] = [
-                    function_encode
-                    for function_encode in list_of_decode_name_functions
-                    if next_token in function_encode
-                ]
+                reminders_of_functions = []
+                for function_encode in list_of_decode_name_functions:
+                    try:
+                        idx = function_encode.index(next_token)
+                        reminders_of_functions.append((function_encode, idx))
+                    except ValueError:
+                        pass
                 if len(reminders_of_functions) == 1:
-                    index = reminders_of_functions[0].index(next_token)
-                    remindersOfTokens = reminders_of_functions[0][index + 1:]
+                    func, idx = reminders_of_functions[0]
+                    remindersOfTokens = func[idx + 1:]
                 if gen in list_of_functions or remindersOfTokens:
                     if remindersOfTokens:
                         tokens.extend(remindersOfTokens)
