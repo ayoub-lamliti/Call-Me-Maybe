@@ -67,10 +67,6 @@ def parse_input_files(
         validated_funcs = [FunctionDefinition(**obj) for obj in raw_funcs]
         list_of_functions = {func.name: func.model_dump()
                              for func in validated_funcs}
-        list_of_decode_name_functions = []
-        for function in list_of_functions:
-            list_of_decode_name_functions.extend(
-                [model.encode(function)[0].tolist()])
         functions_tools = "\n".join(
             json.dumps(func.model_dump()) for func in validated_funcs
         )
@@ -81,7 +77,6 @@ def parse_input_files(
             list_of_functions,
             functions_tools,
             validated_prompts,
-            list_of_decode_name_functions,
         )
 
     except FileNotFoundError as e:

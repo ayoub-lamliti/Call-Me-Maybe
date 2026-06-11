@@ -25,7 +25,6 @@ def main() -> None:
         list_of_functions,
         functions_tools,
         prompts_data,
-        list_of_decode_name_functions,
     ) = parse_input_files(args, model)
     clean_vocab = build_clean_vocab(model)
     print("[*] Building Prefix Cache for Function Names...")
