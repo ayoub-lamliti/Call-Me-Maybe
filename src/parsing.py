@@ -68,7 +68,8 @@ def parse_input_files(
         list_of_functions = {func.name: func.model_dump()
                              for func in validated_funcs}
         functions_tools = "\n".join(
-            json.dumps(func.model_dump()) for func in validated_funcs
+            f'{func.name}({", ".join(func.parameters.keys())})-{func.description}'
+            for func in validated_funcs
         )
         with open(args.input, "r") as f:
             raw_prompts = json.load(f)
