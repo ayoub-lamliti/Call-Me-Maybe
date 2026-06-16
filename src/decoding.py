@@ -56,7 +56,7 @@ def get_allowed_ids_for_numbers(
     JSON value.  When is_last=True the value is terminated by `}`;
     otherwise it is terminated by `,`."""
     allowed_ids: list[int] = []
-    allowed_chars = set("0123456789.-} ") if is_last else set("0123456789.-, ")
+    allowed_chars = set("0123456789.-}") if is_last else set("0123456789.-,")
     for token_id, token_text in clean_vocab.items():
         if (not token_text or token_text.count("}") > 1
                 or token_text.count(",") > 1):
@@ -95,9 +95,9 @@ def get_allowed_ids_for_booleans(
 ) -> list[int]:
     """Return token IDs valid for the current partial boolean value."""
     if is_last:
-        target_list = ["true}", "false}", "true }", "false }"]
+        target_list = ["true}", "false}"]
     else:
-        target_list = ["true,", "false,", "true ,", "false ,"]
+        target_list = ["true,", "false,"]
     return get_allowed_tokens(target_list, gen, clean_vocab)
 
 

@@ -32,7 +32,7 @@ def main() -> None:
     print("[*] Building Prefix Cache for Function Names...")
     prefix_cache = build_prefix_cache(
         list(list_of_functions.keys()), clean_vocab)
-    parameters_injection = model.encode('", "parameters": {')[0].tolist()
+    parameters_injection = model.encode('","parameters":{')[0].tolist()
     end_injection = model.encode("}")[0].tolist()
     numbers = get_allowed_ids_for_numbers(clean_vocab, False)
     numbers_in_case_is_last = get_allowed_ids_for_numbers(clean_vocab, True)
@@ -47,12 +47,12 @@ def main() -> None:
         schema_parameters: dict = {}
         flag = True
         raw_prompt_text = item["prompt"]
+        name_function = ""
         print(f"[*] Processing: {raw_prompt_text}")
 
         safe_user_prompt = json.dumps(raw_prompt_text)
         prompt = generate_prompt(functions_tools, safe_user_prompt)
         tokens = model.encode(prompt)[0].tolist()
-
         while state != "END":
             allowed_ids = []
             if flag:
@@ -61,7 +61,7 @@ def main() -> None:
                 allowed_ids = prefix_cache.get(gen, [])
             elif state == "PARAM_KEYS":
                 for key in schema_parameters.keys():
-                    tokens.extend(model.encode(f'"{key}": ')[0].tolist())
+                    tokens.extend(model.encode(f'"{key}":')[0].tolist())
                     flag = False
                     curr_key = key
                     state = "PARAM_VALUES"
@@ -101,6 +101,7 @@ def main() -> None:
 
             if state == "FUNCTION_NAME":
                 if gen in list_of_functions:
+                    name_function = gen
                     schema_parameters = list_of_functions[gen].get(
                         "parameters", {}).copy()
                     tokens.extend(parameters_injection)
@@ -141,13 +142,15 @@ def main() -> None:
                             tokens.extend(end_injection)
                         state = "END"
         result_raw = model.decode(tokens)
+
         try:
             json_start_index = result_raw.find(
-                f'{{"prompt": {safe_user_prompt}')
+                f'"name":"{name_function}"')
             if json_start_index == -1:
                 raise ValueError("JSON start object not found.")
 
-            clean_json_str = result_raw[json_start_index:]
+            clean_json_str = f'{{"prompt":{safe_user_prompt},'
+            clean_json_str += result_raw[json_start_index:]
             parsed_json = json.loads(clean_json_str)
             func_name = parsed_json.get("name")
             if func_name in list_of_functions:
