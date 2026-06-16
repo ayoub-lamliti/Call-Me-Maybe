@@ -14,10 +14,12 @@ from .decoding import (
     apply_logits_mask,
     build_prefix_cache,
 )
+from .banner import Fore, banner
 
 
 def main() -> None:
     """Entry point: load model, process all prompts, write results."""
+    print(Fore.GREEN + banner)
     print("[*] Loading Model...")
     args = parse_arguments()
     model = Small_LLM_Model(args.model)
@@ -189,4 +191,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt as e:
+        ...

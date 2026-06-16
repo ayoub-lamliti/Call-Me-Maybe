@@ -5,10 +5,12 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
+    "colorama>=0.4.6",
     "flake8>=7.3.0",
     "llm-sdk",
     "mypy>=2.1.0",
     "pydantic>=2.13.4",
+    "pyfiglet>=1.0.4",
 ]
 
 [tool.uv.workspace]
