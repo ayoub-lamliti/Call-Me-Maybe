@@ -47,6 +47,12 @@ def parse_arguments() -> argparse.Namespace:
         default="data/output/function_calling_results.json",
         help="Path where the output JSON results will be written.",
     )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="Qwen/Qwen3-0.6B",
+        help="The Hugging Face repository ID (default: %(default)s).",
+    )
     return parser.parse_args()
 
 

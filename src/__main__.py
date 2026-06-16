@@ -19,8 +19,8 @@ from .decoding import (
 def main() -> None:
     """Entry point: load model, process all prompts, write results."""
     print("[*] Loading Model...")
-    model = Small_LLM_Model()
     args = parse_arguments()
+    model = Small_LLM_Model(args.model)
     (
         list_of_functions,
         functions_tools,

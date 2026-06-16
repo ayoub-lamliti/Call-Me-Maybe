@@ -51,14 +51,14 @@
         "name": "fn_execute_sql_query",
         "parameters": {
             "query": "INSERT INTO logs VALUES (1, 2, 3)",
-            "database": "system"
+            "database": "system database"
         }
     },
     {
         "prompt": "Read the file at /home/user/data.json with utf-8 encoding",
         "name": "fn_read_file",
         "parameters": {
-            "path": " /home/user/data.json",
+            "path": " /home/user/data.json ",
             "encoding": "utf-8"
         }
     },
