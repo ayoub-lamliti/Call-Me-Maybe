@@ -48,9 +48,8 @@ def main() -> None:
         flag = True
         raw_prompt_text = item["prompt"]
         name_function = ""
-        print(f"[*] Processing: {raw_prompt_text}")
-
         safe_user_prompt = json.dumps(raw_prompt_text)
+        print(f"[*] Processing: {safe_user_prompt}")
         prompt = generate_prompt(functions_tools, safe_user_prompt)
         tokens = model.encode(prompt)[0].tolist()
         while state != "END":
